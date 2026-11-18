@@ -1,0 +1,6 @@
+{
+  "name": "AI LEARNING",
+  "description": "생성형 AI부터 실무 자동화까지, AI 실무 교육 과정 안내 및 수강신청 플랫폼",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,127 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Primitives
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'bhher30@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerifiedUser() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Validation Blueprints
+    function isValidCourse(course) {
+      return course is string && course.size() <= 60 && course in [
+        '생성형 AI 활용 과정',
+        'Python 기반 AI 프로그래밍',
+        'ChatGPT 실무 활용',
+        'AI 자동화 및 업무 효율화',
+        'Spring Boot AI 연동 실습'
+      ];
+    }
+
+    function isValidStatus(status) {
+      return status is string && status.size() <= 20 && status in [
+        '신청접수',
+        '검토중',
+        '승인완료',
+        '취소'
+      ];
+    }
+
+    function isValidApplicationFields(data) {
+      return data.name is string && data.name.size() >= 2 && data.name.size() <= 50 &&
+        data.email is string && data.email.size() >= 5 && data.email.size() <= 120 &&
+        data.email.matches('^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$') &&
+        data.phone is string && data.phone.size() >= 9 && data.phone.size() <= 20 &&
+        data.phone.matches('^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$') &&
+        isValidCourse(data.course) &&
+        data.motivation is string && data.motivation.size() >= 5 && data.motivation.size() <= 1000 &&
+        isValidStatus(data.status) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidApplicationCreate(data) {
+      return data.keys().hasAll(['name', 'email', 'phone', 'course', 'motivation', 'status', 'createdAt']) &&
+        data.keys().hasOnly(['name', 'email', 'phone', 'course', 'motivation', 'status', 'createdAt']) &&
+        isValidApplicationFields(data) &&
+        data.status == '신청접수' &&
+        data.createdAt == request.time;
+    }
+
+    function isValidApplicationUpdate(data) {
+      return data.keys().hasAll(['name', 'email', 'phone', 'course', 'motivation', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['name', 'email', 'phone', 'course', 'motivation', 'status', 'createdAt', 'updatedAt']) &&
+        isValidApplicationFields(data) &&
+        data.updatedAt is timestamp &&
+        data.updatedAt == request.time;
+    }
+
+    function isValidAdminDoc(data) {
+      return data.keys().hasAll(['email', 'role', 'createdAt']) &&
+        data.keys().hasOnly(['email', 'role', 'createdAt']) &&
+        data.email is string && data.email.size() >= 5 && data.email.size() <= 120 &&
+        data.role == 'admin' &&
+        data.createdAt is timestamp &&
+        data.createdAt == request.time;
+    }
+
+    // Applications Collection
+    match /applications/{applicationId} {
+      // PII Protection: Only verified administrators can view or list applications
+      allow get: if isValidId(applicationId) && isAdmin();
+      allow list: if isAdmin();
+
+      // Public enrollment submission with strict schema, initial status, and server timestamp enforcement
+      allow create: if isValidId(applicationId) && isValidApplicationCreate(incoming());
+
+      // Admin-only status update (Action-based: status + updatedAt only; createdAt and applicant fields immutable)
+      allow update: if isAdmin() &&
+        isValidId(applicationId) &&
+        isValidApplicationUpdate(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+      // Admin-only deletion
+      allow delete: if isValidId(applicationId) && isAdmin();
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && isVerifiedUser() && (request.auth.uid == adminId || isBootstrappedAdmin());
+      allow list: if isBootstrappedAdmin();
+      allow create, update: if isBootstrappedAdmin() && isValidId(adminId) && isValidAdminDoc(incoming());
+      allow delete: if isBootstrappedAdmin() && isValidId(adminId);
+    }
+  }
+}

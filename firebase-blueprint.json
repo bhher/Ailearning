@@ -1,0 +1,110 @@
+{
+  "entities": {
+    "Application": {
+      "title": "Course Application",
+      "description": "AI 강의 수강신청 내역 엔티티",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "신청자 이름",
+          "minLength": 2,
+          "maxLength": 50
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "신청자 이메일 주소",
+          "minLength": 5,
+          "maxLength": 120,
+          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+        },
+        "phone": {
+          "type": "string",
+          "description": "신청자 휴대폰 번호",
+          "minLength": 9,
+          "maxLength": 20,
+          "pattern": "^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$"
+        },
+        "course": {
+          "type": "string",
+          "description": "신청 강의명",
+          "enum": [
+            "생성형 AI 활용 과정",
+            "Python 기반 AI 프로그래밍",
+            "ChatGPT 실무 활용",
+            "AI 자동화 및 업무 효율화",
+            "Spring Boot AI 연동 실습"
+          ],
+          "maxLength": 60
+        },
+        "motivation": {
+          "type": "string",
+          "description": "수강 신청 동기",
+          "minLength": 5,
+          "maxLength": 1000
+        },
+        "status": {
+          "type": "string",
+          "description": "신청 처리 상태",
+          "enum": ["신청접수", "검토중", "승인완료", "취소"],
+          "maxLength": 20
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "신청 접수 일시 (서버 타임스탬프)"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "상태 변경 일시 (서버 타임스탬프)"
+        }
+      },
+      "required": [
+        "name",
+        "email",
+        "phone",
+        "course",
+        "motivation",
+        "status",
+        "createdAt"
+      ]
+    },
+    "AdminUser": {
+      "title": "Administrator Account",
+      "description": "승인된 관리자 계정 정보",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "관리자 이메일",
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "description": "관리자 권한 등급",
+          "enum": ["admin"],
+          "maxLength": 20
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "등록 일시"
+        }
+      },
+      "required": ["email", "role", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/applications/{applicationId}": {
+      "schema": { "$ref": "#/entities/Application" },
+      "description": "일반 사용자가 등록하고 관리자만 조회/상태변경/삭제할 수 있는 수강신청 컬렉션"
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "신뢰할 수 있는 관리자 UID 목록 컬렉션"
+    }
+  }
+}
